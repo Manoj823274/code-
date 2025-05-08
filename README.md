@@ -54,3 +54,44 @@ public boolean verifyPayment(String orderId, String paymentId, String signature)
         return false;
     }
 }
+@Entity
+public class PaymentTransaction {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String orderId;
+    private String paymentId;
+    private String signature;
+    private int amount;
+    private String status; // CREATED, SUCCESS, FAILED
+    private LocalDateTime createdAt;
+
+    // Getters, Setters
+}
+@Repository
+public interface PaymentTransactionRepository extends JpaRepository<PaymentTransaction, Long> {
+    Optional<PaymentTransaction> findByOrderId(String orderId);
+}
+@Autowired
+private PaymentTransactionRepository paymentRepo;
+
+@PostMapping("/create")
+public String createOrder(@RequestParam("amount") int amount) throws RazorpayException {
+    JSONObject orderRequest = new JSONObject();
+    orderRequest.put("amount", amount * 100);
+    orderRequest.put("currency", "INR");
+    orderRequest.put("payment_capture", 1);
+
+    Order order = razorpayClient.orders.create(orderRequest);
+
+    // Save to DB
+    PaymentTransaction txn = new PaymentTransaction();
+    txn.setOrderId(order.get("id"));
+    txn.setAmount(amount);
+    txn.setStatus("CREATED");
+    txn.setCreatedAt(LocalDateTime.now());
+    paymentRepo.save(txn);
+
+    return order.get("id");
+}
